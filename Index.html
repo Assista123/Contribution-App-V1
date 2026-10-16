@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Collectly</title>
+    <style>
+        :root {
+            --primary: #1a73e8;
+            --success: #34a853;
+            --error: #ea4335;
+            --bg: #f8f9fa;
+            --card-bg: #ffffff;
+            --text: #202124;
+            --border: #dadce0;
+            --warning: #f9ab00;
+        }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--bg); color: var(--text); margin: 0; padding: 20px; }
+        .container { max-width: 780px; margin: 0 auto; background: var(--card-bg); padding: 30px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+        h2, h3 { color: var(--primary); margin-top: 0; }
+        .form-group { margin-bottom: 16px; }
+        label { display: block; font-weight: 600; margin-bottom: 6px; font-size: 14px; }
+        input, select { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; box-sizing: border-box; font-size: 14px; }
+        .btn { background-color: var(--primary); color: white; border: none; padding: 12px 20px; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: bold; width: 100%; margin-top: 10px; }
+        .btn:hover { opacity: 0.9; }
+        .btn-sm { padding: 6px 12px; font-size: 13px; width: auto; margin-top: 0; }
+        .btn-outline { background: #fff; color: var(--primary); border: 1px solid var(--primary); }
+        .nav-links { text-align: center; margin-top: 20px; font-size: 14px; }
+        .nav-links a { color: var(--primary); cursor: pointer; text-decoration: none; }
+        .nav-links a:hover { text-decoration: underline; }
+        .panel { display: none; }
+        .active-panel { display: block; }
+        .result-box { margin-top: 15px; background: #f1f3f4; padding: 15px; border-radius: 8px; }
+        .admin-card { background: #fff; padding: 12px; border: 1px solid var(--border); border-radius: 6px; margin-bottom: 10px; }
+        .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: 600; }
+        .badge-success { background: #e6f4ea; color: var(--success); }
+        .badge-error { background: #fce8e6; color: var(--error); }
+        .badge-warning { background: #fef7e0; color: #b06000; }
+        .section-title { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+        .item-card { display: flex; justify-content: space-between; align-items: center; gap: 12px; background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 14px; margin-bottom: 10px; cursor: pointer; }
+        .item-card:hover { border-color: var(--primary); }
+        .muted { font-size: 13px; color: #5f6368; }
+        hr.sep { border: 0; border-top: 1px solid var(--border); margin: 20px 0; }
+        .list-box { background:#fff; padding:8px; border-radius:4px; max-height:200px; overflow-y:auto; border:1px solid var(--border); }
+    </style>
+</head>
+<body>
+
+<div class="container">
+
+    <!-- PAYER: OPEN ITEMS (default screen, no login needed) -->
+    <div id="panel-pay" class="panel active-panel">
+        <h2 id="group-title">Collectly</h2>
+        <p class="muted" style="margin-top:0;">Choose what you want to pay for, then get a reference tag to put in your transfer narration.</p>
+        <div id="open-items">Loading payment items...</div>
+        <div class="nav-links"><a onclick="switchPanel('login')">Member sign in (My Payments)</a> | <a onclick="switchPanel('admin-login')">Admin Portal</a></div>
+    </div>
+
+    <!-- PAYER: PAY FOR ONE ITEM -->
+    <div id="panel-pay-form" class="panel">
+        <h2 id="pay-item-title">Pay</h2>
+        <p class="muted" id="pay-item-sub" style="margin-top:0;"></p>
+        <div class="form-group"><label>Your Name</label><input type="text" id="pay-name" placeholder="Name you want recorded (needed to tick you off the list)"></div>
+        <div class="form-group"><label>Phone Number (optional, helps us match you)</label><input type="text" id="pay-phone" placeholder="08012345678"></div>
+        <div class="form-group"><label>Amount (₦)</label><input type="number" id="pay-amount" placeholder="5000"></div>
+        <button class="btn" style="background:var(--success);" onclick="submitPaymentIntent()">Generate Reference Tag</button>
+        <div id="pay-result" class="result-box" style="display:none; border-left:4px solid var(--success);"></div>
+        <div class="nav-links"><a onclick="backToItems()">&larr; Back to payment items</a></div>
+    </div>
+
+    <!-- MEMBER LOGIN -->
+    <div id="panel-login" class="panel">
+        <h2>Member Sign In</h2>
+        <p class="muted" style="margin-top:0;">Optional. Sign in to see your own payment history. Your Member ID is given to you by the admin.</p>
+        <div class="form-group"><label>Member ID</label><input type="text" id="login-id" placeholder="MEM-1001"></div>
+        <div class="form-group"><label>Phone Number</label><input type="text" id="login-phone" placeholder="08012345678"></div>
+        <button class="btn" onclick="loginMember()">View My Payments</button>
+        <div class="nav-links"><a onclick="backToItems()">&larr; Back to payment items</a> | <a onclick="switchPanel('admin-login')">Admin Portal</a></div>
+    </div>
+
+    <!-- MEMBER: MY PAYMENTS -->
+    <div id="panel-dashboard" class="panel">
+        <h2>Welcome, <span id="dash-name"></span></h2>
+        <p><strong>Member ID:</strong> <span id="dash-id"></span></p>
+        <h3>My Payments</h3>
+        <div id="dash-items" class="result-box">Loading...</div>
+        <div class="nav-links" style="margin-top:30px;"><a onclick="backToItems()">&larr; Pay for an item</a> | <a onclick="switchPanel('login')">Sign Out</a></div>
+    </div>
+
+    <!-- ADMIN LOGIN -->
+    <div id="panel-admin-login" class="panel">
+        <h2>Admin Sign In</h2>
+        <div class="form-group"><label>Admin Phone Number</label><input type="text" id="admin-phone"></div>
+        <div class="form-group"><label>PIN Code</label><input type="password" id="admin-pin"></div>
+        <button class="btn" onclick="adminLogin()">Login as Admin</button>
+        <div class="nav-links"><a onclick="backToItems()">&larr; Back to payment items</a></div>
+    </div>
+
+    <!-- ADMIN DASHBOARD -->
+    <div id="panel-admin-dash" class="panel">
+        <h2>Admin Dashboard</h2>
+        <p>Logged in as: <span id="admin-name-display" style="font-weight:bold;"></span></p>
+
+        <!-- PAID VS YET TO PAY -->
+        <hr class="sep">
+        <h3>Paid vs Yet to Pay</h3>
+        <div class="form-group">
+            <label>Select Payment Item</label>
+            <select id="summary-item-select"><option value="">-- Select Item --</option></select>
+        </div>
+        <button class="btn" onclick="fetchItemSummary()">Show Summary</button>
+
+        <div id="item-summary-result" class="result-box" style="display:none;">
+            <p><strong>Item:</strong> <span id="sum-item-name"></span> &nbsp;|&nbsp; <strong>Amount:</strong> ₦<span id="sum-item-amount"></span> &nbsp;|&nbsp; <strong>Deadline:</strong> <span id="sum-item-deadline"></span></p>
+            <p><strong>Total Collected:</strong> ₦<span id="sum-collected" style="color:var(--success); font-weight:bold;"></span> &nbsp;|&nbsp; <span id="sum-counts" class="muted"></span></p>
+
+            <h4 style="color:var(--success); margin:15px 0 6px 0;">Paid</h4>
+            <div id="sum-paid-list" class="list-box"></div>
+            <h4 style="color:#b06000; margin:15px 0 6px 0;">Partial</h4>
+            <div id="sum-partial-list" class="list-box"></div>
+            <h4 style="color:var(--error); margin:15px 0 6px 0;">Yet to Pay (listed members)</h4>
+            <div id="sum-notpaid-list" class="list-box"></div>
+
+            <div style="display:flex; gap:8px; margin-top:12px;">
+                <button class="btn btn-sm btn-outline" onclick="exportItemCsv()">Download CSV</button>
+                <button class="btn btn-sm btn-outline" id="toggle-item-btn" onclick="toggleItemStatus()">Close Item</button>
+            </div>
+        </div>
+
+        <!-- PENDING PAYMENTS -->
+        <hr class="sep">
+        <h3>Pending Payment Intents</h3>
+        <div id="admin-pending-payments" class="result-box">Loading pending payments...</div>
+
+        <!-- UNMATCHED BANK ALERTS -->
+        <hr class="sep">
+        <div class="section-title">
+            <h3 style="margin:0;">Unmatched Bank Alerts (Manual Review)</h3>
+            <button class="btn btn-sm" onclick="loadPendingPayments(); loadUnmatchedAlerts();">Refresh</button>
+        </div>
+        <p class="muted" style="margin-top:4px;">Alerts that arrived without a TXN reference (or failed auto-match). Match them to a pending payment.</p>
+        <div id="admin-unmatched-alerts" class="result-box">Loading...</div>
+
+        <!-- OFFLINE PAYMENT -->
+        <hr class="sep">
+        <h3>Record Offline / Direct Payment</h3>
+        <p class="muted">Use this when someone paid cash or transferred without generating a reference tag.</p>
+        <div class="form-group"><label>Payment Item</label><select id="offline-item"><option value="">-- Select Item --</option></select></div>
+        <div class="form-group"><label>Payer Name</label><input type="text" id="offline-sender" placeholder="John Doe"></div>
+        <div class="form-group"><label>Payer Phone (optional)</label><input type="text" id="offline-phone" placeholder="08012345678"></div>
+        <div class="form-group"><label>Amount (₦)</label><input type="number" id="offline-amount" placeholder="5000"></div>
+        <div class="form-group"><label>Payment Method</label>
+            <select id="offline-method">
+                <option value="Cash">Cash</option>
+                <option value="Direct Transfer">Direct Transfer</option>
+                <option value="POS">POS</option>
+                <option value="Other">Other</option>
+            </select>
+        </div>
+        <button class="btn" style="background:var(--success);" onclick="recordOfflinePayment()">Record Offline Payment</button>
+
+        <!-- CREATE PAYMENT ITEM -->
+        <hr class="sep">
+        <h3>Create Payment Item</h3>
+        <div class="form-group"><label>Item Name</label><input type="text" id="item-name-input" placeholder="e.g. October Dues"></div>
+        <div class="form-group"><label>Amount (₦) <span class="muted">(0 = any amount)</span></label><input type="number" id="item-amount-input" placeholder="e.g. 5000"></div>
+        <div class="form-group"><label>Deadline (optional)</label><input type="date" id="item-deadline-input"></div>
+        <button class="btn" onclick="createItem()">Create Payment Item</button>
+
+        <!-- MEMBERS -->
+        <hr class="sep">
+        <h3>Add Member</h3>
+        <p class="muted">Members are optional. Adding them lets the system show who has not paid yet.</p>
+        <div class="form-group"><label>Full Name</label><input type="text" id="member-name-input" placeholder="e.g. Chiemerie Chinedu"></div>
+        <div class="form-group"><label>Phone Number</label><input type="text" id="member-phone-input" placeholder="08012345678"></div>
+        <button class="btn" onclick="addMember()">Add Member</button>
+
+        <!-- COLLECTION ACCOUNT -->
+        <hr class="sep">
+        <h3>Group &amp; Collection Account</h3>
+        <p class="muted" style="margin-top:0;">Shown to payers when they generate a reference tag.</p>
+        <div class="form-group"><label>Group Name</label><input type="text" id="setting-group-name" placeholder="e.g. Unity Cooperative"></div>
+        <div class="form-group"><label>Bank Name</label><input type="text" id="setting-bank-name" placeholder="e.g. ALAT / Kuda / Moniepoint"></div>
+        <div class="form-group"><label>Account Number</label><input type="text" id="setting-account-number" placeholder="0123456789"></div>
+        <div class="form-group"><label>Account Name</label><input type="text" id="setting-account-name" placeholder="Group Name"></div>
+        <button class="btn" style="background:var(--success);" onclick="saveCollectionAccount()">Save</button>
+        <div id="settings-save-result" style="margin-top:10px; font-size:14px; display:none;"></div>
+
+        <div class="nav-links" style="margin-top:30px;"><a onclick="adminSignOut()">Sign Out</a></div>
+    </div>
+
+</div>
+
+<script>
+    const API_URL = "https://script.google.com/macros/s/AKfycbxiYHXtsoWXmY2MlUJzkq756qI3PLPEJnYBJlLAWrqx9Lj74oVfkyjkHmWOkhshPNz1TQ/exec";
+    let currentAdminName = "";
+    let pendingPaymentsCache = [];
+    let openItemsCache = [];
+    let allItemsCache = [];
+    let selectedItem = null;
+    let currentSummary = null;
+
+    /* ---------- Helpers ---------- */
+    function esc(v) {
+        return String(v === undefined || v === null ? "" : v)
+            .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+    }
+    function naira(n) { return "₦" + Number(n || 0).toLocaleString(); }
+    function post(payload) {
+        return fetch(API_URL, { method: 'POST', body: JSON.stringify(payload) }).then(r => r.json());
+    }
+    function get(params) {
+        return fetch(API_URL + "?" + new URLSearchParams(params).toString()).then(r => r.json());
+    }
+    function switchPanel(name) {
+        document.querySelectorAll('.panel').forEach(p => p.classList.remove('active-panel'));
+        document.getElementById('panel-' + name).classList.add('active-panel');
+    }
+    function backToItems() { switchPanel('pay'); loadPublicPage(); }
+
+    /* ---------- PAYER SIDE ---------- */
+    function loadPublicPage() {
+        get({ action: "getPublicInfo" }).then(d => {
+            if (d.status === 'success') document.getElementById('group-title').innerText = d.groupName;
+        }).catch(() => {});
+
+        get({ action: "getOpenItems" }).then(d => {
+            const box = document.getElementById('open-items');
+            if (d.status !== 'success' || d.items.length === 0) {
+                box.innerHTML = "<p class='muted'>No open payment items right now.</p>";
+                openItemsCache = [];
+                return;
+            }
+            openItemsCache = d.items;
+            box.innerHTML = d.items.map((it, idx) => `
+                <div class="item-card" onclick="openPayForm(${idx})">
+                    <div>
+                        <strong>${esc(it.itemName)}</strong><br>
+                        <span class="muted">${it.amount > 0 ? naira(it.amount) : "Any amount"}${it.deadline ? " · Due " + esc(it.deadline) : ""}</span>
+                    </div>
+                    <span class="badge badge-success">Pay</span>
+                </div>`).join("");
+        }).catch(() => { document.getElementById('open-items').innerText = "Could not load items. Please refresh."; });
+    }
+
+    function openPayForm(idx) {
+        selectedItem = openItemsCache[idx];
+        document.getElementById('pay-item-title').innerText = "Pay: " + selectedItem.itemName;
+        document.getElementById('pay-item-sub').innerText = selectedItem.amount > 0 ? "Amount due: " + naira(selectedItem.amount) : "Pay any amount you wish.";
+        document.getElementById('pay-amount').value = selectedItem.amount > 0 ? selectedItem.amount : "";
+        document.getElementById('pay-result').style.display = 'none';
+        switchPanel('pay-form');
+    }
+
+    function submitPaymentIntent() {
+        if (!selectedItem) return;
+        const amount = document.getElementById('pay-amount').value.trim();
+        if (!amount || Number(amount) <= 0) return alert("Enter a valid amount.");
+
+        post({
+            action: "submitPaymentIntent",
+            itemId: selectedItem.itemId,
+            payerName: document.getElementById('pay-name').value.trim(),
+            phone: document.getElementById('pay-phone').value.trim(),
+            amount: amount
+        }).then(data => {
+            if (data.status !== 'success') return alert(data.message);
+            const c = data.collectionAccount || {};
+            document.getElementById('pay-result').innerHTML = `
+                <p style="margin:0 0 8px 0; font-weight:bold; color:var(--success);">${esc(data.message)}</p>
+                <div style="background:#e8f0fe; padding:12px; border-radius:6px; margin-top:10px;">
+                    <p style="margin:0 0 6px 0;"><strong>Send payment to:</strong></p>
+                    <p style="margin:0;">Bank: <strong>${esc(c.bankName || 'Not set')}</strong></p>
+                    <p style="margin:0;">Account Number: <strong>${esc(c.accountNumber || 'Not set')}</strong></p>
+                    <p style="margin:0;">Account Name: <strong>${esc(c.accountName || 'Not set')}</strong></p>
+                    <p style="margin:8px 0 0 0; font-size:13px; color:#5f6368;">
+                        Put <strong>${esc(data.transactionId)}</strong> in the transfer narration, and send exactly ${naira(data.amount)}.
+                    </p>
+                </div>`;
+            document.getElementById('pay-result').style.display = 'block';
+        }).catch(() => alert("Network error. Please try again."));
+    }
+
+    /* ---------- MEMBER: MY PAYMENTS ---------- */
+    function loginMember() {
+        const memberId = document.getElementById('login-id').value.trim();
+        const phone = document.getElementById('login-phone').value.trim();
+        if (!memberId || !phone) return alert("Enter your Member ID and phone number.");
+
+        get({ action: "getMyPayments", memberId: memberId, phone: phone }).then(data => {
+            if (data.status !== 'success') return alert(data.message);
+            document.getElementById('dash-name').innerText = data.member.fullName;
+            document.getElementById('dash-id').innerText = data.member.memberId;
+
+            const badge = s => s === "Paid" ? "badge-success" : (s === "Partial" ? "badge-warning" : "badge-error");
+            document.getElementById('dash-items').innerHTML = data.items.length === 0
+                ? "No payment items yet."
+                : data.items.map(it => `
+                    <div class="admin-card">
+                        <div class="section-title" style="margin:0;">
+                            <strong>${esc(it.itemName)}</strong>
+                            <span class="badge ${badge(it.status)}">${esc(it.status)}</span>
+                        </div>
+                        <div class="muted">Paid ${naira(it.paid)}${it.amount > 0 ? " of " + naira(it.amount) : ""}${it.itemStatus === "Closed" ? " · Closed" : ""}</div>
+                    </div>`).join("");
+            switchPanel('dashboard');
+        }).catch(() => alert("Network error. Please try again."));
+    }
+
+    /* ---------- ADMIN ---------- */
+    function adminLogin() {
+        const phone = document.getElementById('admin-phone').value.trim();
+        const pin = document.getElementById('admin-pin').value.trim();
+        post({ action: "adminLogin", phone: phone, pin: pin }).then(data => {
+            if (data.status === 'success') {
+                currentAdminName = data.admin.name;
+                document.getElementById('admin-name-display').innerText = `${currentAdminName} (${data.admin.role})`;
+                loadAdminDashboard();
+                switchPanel('admin-dash');
+            } else { alert(data.message); }
+        });
+    }
+
+    function adminSignOut() {
+        currentAdminName = "";
+        document.getElementById('admin-pin').value = "";
+        backToItems();
+    }
+
+    function loadAdminDashboard() {
+        loadAllItems();
+        loadPendingPayments();
+        loadUnmatchedAlerts();
+        loadCollectionAccount();
+    }
+
+    function loadAllItems() {
+        return get({ action: "getAllItems" }).then(data => {
+            allItemsCache = (data.status === 'success') ? data.items : [];
+            const opts = allItemsCache.length
+                ? `<option value="">-- Select Item --</option>` + allItemsCache.map(it =>
+                    `<option value="${esc(it.itemId)}">${esc(it.itemName)}${it.status === "Closed" ? " (Closed)" : ""}</option>`).join("")
+                : `<option value="">No payment items yet</option>`;
+            document.getElementById('summary-item-select').innerHTML = opts;
+            const openOpts = allItemsCache.filter(i => i.status !== "Closed");
+            document.getElementById('offline-item').innerHTML = openOpts.length
+                ? `<option value="">-- Select Item --</option>` + openOpts.map(it => `<option value="${esc(it.itemId)}">${esc(it.itemName)}</option>`).join("")
+                : `<option value="">No open items</option>`;
+        });
+    }
+
+    function createItem() {
+        const itemName = document.getElementById('item-name-input').value.trim();
+        const amount = document.getElementById('item-amount-input').value.trim();
+        const deadline = document.getElementById('item-deadline-input').value;
+        if (!itemName || amount === "") return alert("Enter an item name and amount.");
+
+        post({ action: "createItem", itemName, amount, deadline }).then(data => {
+            alert(data.message);
+            if (data.status === 'success') {
+                document.getElementById('item-name-input').value = "";
+                document.getElementById('item-amount-input').value = "";
+                document.getElementById('item-deadline-input').value = "";
+                loadAllItems();
+            }
+        });
+    }
+
+    function addMember() {
+        const fullName = document.getElementById('member-name-input').value.trim();
+        const phone = document.getElementById('member-phone-input').value.trim();
+        if (!fullName || !phone) return alert("Enter the member's name and phone number.");
+
+        post({ action: "addMember", fullName, phone }).then(data => {
+            alert(data.message);
+            if (data.status === 'success') {
+                document.getElementById('member-name-input').value = "";
+                document.getElementById('member-phone-input').value = "";
+            }
+        });
+    }
+
+    function loadPendingPayments() {
+        return get({ action: "getAdminData" }).then(data => {
+            pendingPaymentsCache = data.pendingPayments || [];
+            const box = document.getElementById('admin-pending-payments');
+            if (data.status === 'success' && pendingPaymentsCache.length > 0) {
+                box.innerHTML = pendingPaymentsCache.map(p => `
+                    <div class="admin-card">
+                        <p style="margin:0 0 5px 0;"><strong>${esc(p.transactionId)}</strong> | ${esc(p.itemName)} | <strong>${naira(p.amount)}</strong></p>
+                        <p style="margin:0 0 10px 0; font-size:13px; color:#555;">Payer: ${esc(p.payerName)}${p.payerPhone ? " (" + esc(p.payerPhone) + ")" : ""}</p>
+                        <button onclick="updatePayment('${esc(p.transactionId)}', 'Confirmed')" class="btn btn-sm" style="background:var(--success); margin-right:5px;">Confirm</button>
+                        <button onclick="updatePayment('${esc(p.transactionId)}', 'Failed')" class="btn btn-sm" style="background:var(--error);">Reject</button>
+                    </div>`).join("");
+            } else { box.innerHTML = "No pending payment intents."; }
+        });
+    }
+
+    function updatePayment(transactionId, status) {
+        const actionName = status === "Confirmed" ? "confirmPayment" : "rejectPayment";
+        post({ action: actionName, transactionId: transactionId, adminName: currentAdminName })
+        .then(data => { alert(data.message); loadPendingPayments().then(loadUnmatchedAlerts); });
+    }
+
+    function loadUnmatchedAlerts() {
+        return get({ action: "getUnmatchedAlerts" }).then(data => {
+            const box = document.getElementById('admin-unmatched-alerts');
+            if (data.status === 'success' && data.unmatchedAlerts.length > 0) {
+                let txOptions = `<option value="">-- Select pending TXN --</option>` + pendingPaymentsCache.map(p =>
+                    `<option value="${esc(p.transactionId)}">${esc(p.transactionId)} – ${naira(p.amount)} (${esc(p.payerName)})</option>`).join("");
+                box.innerHTML = data.unmatchedAlerts.map(a => `
+                    <div class="admin-card">
+                        <p style="margin:0 0 4px 0;"><strong>${esc(a.alertId)}</strong> <span class="badge badge-warning">${esc(a.matchStatus)}</span></p>
+                        <p style="margin:0 0 4px 0; font-size:13px;">
+                            <strong>${naira(a.amount)}</strong> from ${esc(a.senderName)} &nbsp;|&nbsp; ${esc(a.bankName)} &nbsp;|&nbsp; ${esc(new Date(a.timestamp).toLocaleString())}
+                        </p>
+                        <p style="margin:0 0 10px 0; font-size:12px; color:#666; max-height:40px; overflow:hidden;">${esc(a.details)}</p>
+                        <div style="display:flex; gap:8px; align-items:center;">
+                            <select id="match-select-${esc(a.alertId)}" style="flex:1; padding:6px;">${txOptions}</select>
+                            <button class="btn btn-sm" style="background:var(--success);" onclick="manualMatch('${esc(a.alertId)}')">Match</button>
+                        </div>
+                    </div>`).join("");
+            } else { box.innerHTML = "No unmatched alerts. All clear!"; }
+        });
+    }
+
+    function manualMatch(alertId) {
+        const transactionId = document.getElementById(`match-select-${alertId}`).value;
+        if (!transactionId) return alert("Please select a pending transaction to match.");
+        if (!confirm(`Match alert ${alertId} → ${transactionId}?`)) return;
+
+        post({ action: "manualMatchAlert", alertId, transactionId, adminName: currentAdminName }).then(data => {
+            alert(data.message);
+            if (data.status === 'success') loadPendingPayments().then(loadUnmatchedAlerts);
+        });
+    }
+
+    /* ---------- Paid vs Yet to Pay ---------- */
+    function fetchItemSummary() {
+        const itemId = document.getElementById('summary-item-select').value;
+        if (!itemId) return alert("Select a payment item first.");
+
+        get({ action: "getItemSummary", itemId }).then(data => {
+            const box = document.getElementById('item-summary-result');
+            if (data.status !== 'success') { alert(data.message); box.style.display = 'none'; return; }
+            const s = data.summary;
+            currentSummary = s;
+
+            document.getElementById('sum-item-name').innerText = `${s.itemName} (${s.itemId})`;
+            document.getElementById('sum-item-amount').innerText = s.amount > 0 ? Number(s.amount).toLocaleString() : "Any";
+            document.getElementById('sum-item-deadline').innerText = s.deadline || "None";
+            document.getElementById('sum-collected').innerText = Number(s.collected).toLocaleString();
+            document.getElementById('sum-counts').innerText = `${s.paidList.length} paid · ${s.partialList.length} partial · ${s.notPaidList.length} yet to pay`;
+
+            document.getElementById('sum-paid-list').innerHTML = s.paidList.length
+                ? s.paidList.map(p => `<div style="margin-bottom:4px;">✓ <strong>${esc(p.name)}</strong>: ${naira(p.total)}</div>`).join("")
+                : "Nobody has paid in full yet.";
+            document.getElementById('sum-partial-list').innerHTML = s.partialList.length
+                ? s.partialList.map(p => `<div style="margin-bottom:4px;">◐ <strong>${esc(p.name)}</strong>: paid ${naira(p.total)}${s.amount > 0 ? ` · <span style="color:var(--error);">owes ${naira(p.owing)}</span>` : ""}</div>`).join("")
+                : "None.";
+            document.getElementById('sum-notpaid-list').innerHTML = s.notPaidList.length
+                ? s.notPaidList.map(p => `<div style="margin-bottom:4px;">✗ <strong>${esc(p.name)}</strong> ${p.phone ? "(" + esc(p.phone) + ")" : ""}</div>`).join("")
+                : "Everyone on the member list has paid (or no members added).";
+
+            document.getElementById('toggle-item-btn').innerText = s.itemStatus === "Closed" ? "Reopen Item" : "Close Item";
+            box.style.display = 'block';
+        });
+    }
+
+    function toggleItemStatus() {
+        if (!currentSummary) return;
+        const newStatus = currentSummary.itemStatus === "Closed" ? "Open" : "Closed";
+        post({ action: "setItemStatus", itemId: currentSummary.itemId, status: newStatus }).then(data => {
+            alert(data.message);
+            if (data.status === 'success') { loadAllItems().then(fetchItemSummary); }
+        });
+    }
+
+    function exportItemCsv() {
+        if (!currentSummary) return;
+        get({ action: "getItemCsv", itemId: currentSummary.itemId }).then(data => {
+            if (data.status !== 'success') return alert(data.message);
+            const blob = new Blob([data.csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = data.filename;
+            document.body.appendChild(a); a.click(); document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        });
+    }
+
+    /* ---------- Collection Account / Group Settings ---------- */
+    function loadCollectionAccount() {
+        get({ action: "getCollectionAccount" }).then(data => {
+            if (data.status === 'success' && data.collectionAccount) {
+                const c = data.collectionAccount;
+                document.getElementById('setting-bank-name').value = c.bankName === "Not set" ? "" : c.bankName;
+                document.getElementById('setting-account-number').value = c.accountNumber === "Not set" ? "" : c.accountNumber;
+                document.getElementById('setting-account-name').value = c.accountName === "Not set" ? "" : c.accountName;
+            }
+        }).catch(err => console.log("Could not load collection account", err));
+        get({ action: "getPublicInfo" }).then(d => {
+            if (d.status === 'success') document.getElementById('setting-group-name').value = d.groupName === "Collectly" ? "" : d.groupName;
+        }).catch(() => {});
+    }
+
+    function saveCollectionAccount() {
+        const groupName = document.getElementById('setting-group-name').value.trim();
+        const bankName = document.getElementById('setting-bank-name').value.trim();
+        const accountNumber = document.getElementById('setting-account-number').value.trim();
+        const accountName = document.getElementById('setting-account-name').value.trim();
+
+        if (!bankName || !accountNumber || !accountName) {
+            return alert("Please fill in Bank Name, Account Number and Account Name.");
+        }
+
+        const resultEl = document.getElementById('settings-save-result');
+        resultEl.style.display = 'block';
+        resultEl.style.color = '#5f6368';
+        resultEl.innerText = "Saving...";
+
+        const save = (key, value) => post({ action: "updateSetting", key, value, adminName: currentAdminName });
+        const jobs = [
+            save("Collection_Bank_Name", bankName),
+            save("Collection_Account_Number", accountNumber),
+            save("Collection_Account_Name", accountName)
+        ];
+        if (groupName) jobs.push(save("Group_Name", groupName));
+
+        Promise.all(jobs).then(results => {
+            const allOk = results.every(r => r.status === 'success');
+            resultEl.style.color = allOk ? 'var(--success)' : 'var(--error)';
+            resultEl.innerText = allOk ? "Saved successfully!" : "Some settings failed to save.";
+        }).catch(() => {
+            resultEl.style.color = 'var(--error)';
+            resultEl.innerText = "Error saving settings.";
+        });
+    }
+
+    /* ---------- Offline Payment ---------- */
+    function recordOfflinePayment() {
+        const itemId = document.getElementById('offline-item').value;
+        const amount = document.getElementById('offline-amount').value.trim();
+        if (!itemId || !amount) return alert("Select a payment item and enter an amount.");
+
+        post({
+            action: "recordOfflinePayment",
+            itemId: itemId,
+            amount: amount,
+            payerName: document.getElementById('offline-sender').value.trim(),
+            phone: document.getElementById('offline-phone').value.trim(),
+            paymentMethod: document.getElementById('offline-method').value,
+            adminName: currentAdminName
+        }).then(data => {
+            alert(data.message);
+            if (data.status === 'success') {
+                document.getElementById('offline-amount').value = "";
+                document.getElementById('offline-sender').value = "";
+                document.getElementById('offline-phone').value = "";
+            }
+        });
+    }
+
+    loadPublicPage();
+</script>
+
+</body>
+</html>
